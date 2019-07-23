@@ -20,8 +20,7 @@ sudo docker run -d -p 8787:8787 -e PASSWORD=<password> -e USER=<username>  -v /P
 ```
 #### If you don't have sudo privileges ask your administrator to be added to the docker group.
 
-### Open up a browser and in the address bar type:
+### Open up a browser, enter the url and once loaded supply the username and password above:
 ```html
 https://localhost:8787
 ```
-#### Enter the username and password you supplied above
