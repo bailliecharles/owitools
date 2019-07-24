@@ -1,0 +1,12 @@
+LIB1    Smpl001 aacaagcc:aacaagcc       GGWACWRGWTGRACWNTNTAYCCYCC      TANACYTCNGGRTGNCCRAARAAYCA      F @ position=01_01A; locality=sample;
+LIB1    Smpl002 ggaatgag:ggaatgag       GGWACWRGWTGRACWNTNTAYCCYCC      TANACYTCNGGRTGNCCRAARAAYCA      F @ position=01_01B; locality=sample;
+LIB1    Smpl003 aattgccg:aattgccg       GGWACWRGWTGRACWNTNTAYCCYCC      TANACYTCNGGRTGNCCRAARAAYCA      F @ position=01_01C; locality=sample;
+LIB1    Smpl004 cgaccata:cgaccata       GGWACWRGWTGRACWNTNTAYCCYCC      TANACYTCNGGRTGNCCRAARAAYCA      F @ position=01_01D; locality=control;
+LIB1    Smpl005 atgctgac:atgctgac       GGWACWRGWTGRACWNTNTAYCCYCC      TANACYTCNGGRTGNCCRAARAAYCA      F @ position=01_01E; locality=control;
+LIB1    Smpl006 tgagacag:tgagacag       GGWACWRGWTGRACWNTNTAYCCYCC      TANACYTCNGGRTGNCCRAARAAYCA      F @ position=01_01F; locality=control;
+LIB1    Smpl007 tgagagct:tgagagct       GGWACWRGWTGRACWNTNTAYCCYCC      TANACYTCNGGRTGNCCRAARAAYCA      F @ position=01_02A; locality=sample;
+LIB1    Smpl008 ctgacctt:ctgacctt       GGWACWRGWTGRACWNTNTAYCCYCC      TANACYTCNGGRTGNCCRAARAAYCA      F @ position=01_02B; locality=sample;
+LIB1    Smpl009 atgcttgg:atgcttgg       GGWACWRGWTGRACWNTNTAYCCYCC      TANACYTCNGGRTGNCCRAARAAYCA      F @ position=01_02C; locality=sample;
+LIB1    Smpl010 aacaccgt:aacaccgt       GGWACWRGWTGRACWNTNTAYCCYCC      TANACYTCNGGRTGNCCRAARAAYCA      F @ position=01_02D; locality=control;
+LIB1    Smpl011 ttaccgct:ttaccgct       GGWACWRGWTGRACWNTNTAYCCYCC      TANACYTCNGGRTGNCCRAARAAYCA      F @ position=01_02E; locality=control;
+LIB1    Smpl012 ccagtatg:ccagtatg       GGWACWRGWTGRACWNTNTAYCCYCC      TANACYTCNGGRTGNCCRAARAAYCA      F @ position=01_02F; locality=control;

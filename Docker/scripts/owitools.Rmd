@@ -1,0 +1,230 @@
+---
+title: "owitools"
+output:
+  html_document:
+    theme: spacelab
+    highlight: haddock
+---
+
+***
+
+<span style="font-size:1.5em;">
+Running the following chunks will produce a reproducible report, tracking the exact lines of code that were run. Optionally, the commands can also be pasted into a terminal prompt. 
+</span>  
+
+***
+
+<br>
+
+
+### Preprocess reads - fastQC and trim 
+```{bash}
+fastqc lib1.R1.fq.gz
+fastqc lib2.R2.fq.gz
+```
+```{r}
+viewer <- getOption("viewer")
+viewer("lib1.R1.html")
+viewer("lib1.R2.html")
+```
+
+
+### 1. Split files into 8 parts
+```{bash, include=T, eval=F}
+
+obidistribute -n 8 -p 'LIB1_R1_part' LIB1_1.trimmed.210.fq
+obidistribute -n 8 -p 'LIB1_R2_part' LIB1_2.trimmed.180.fq
+
+obidistribute -n 8 -p 'LIB2_R1_part' LIB2_1.trimmed.210.fq
+obidistribute -n 8 -p 'LIB2_R2_part' LIB2_2.trimmed.180.fq
+```
+<br>
+<br>
+
+### 2. Execute Rscript to generate bash scripts - FIRST NEED TO OPEN AND EDIT the generate_sh_scripts_LIB1.R script with LIB1 sample info. Probably best to copy the script to the directory you're working in.
+```{bash, include=T, eval=F}
+# vim generate_sh_scripts_LIB1.R # edit script with LIB1 sample info
+Rscript generate_sh_scripts_LIB1.R #generate
+Rscript generate_sh_scripts_LIB2.R
+```
+<br>
+<br>
+
+### 3. Paired-end alignment: merges R1 and R2, then splits in "Good" and "Bad" based on an alignment score cut-off of 40.
+```{bash, include=T, eval=F}
+for i in {1..8}; do bash LIB1paired_part$i.sh & done
+for i in {1..8}; do bash LIB2paired_part$i.sh & done
+```
+<br>
+<br>
+
+### 4. Demultiplex (need ngsfilter formatted .tsv file)
+> <span style="color:red; font-size:1em;">IMPORTANT</span> if you are running multiple libraries from the same project each sample must have unique names across both libs in the .tsv file, e.g. Smpl001..096 in library one, and Smpl097..Smpl192 in library two.
+```{bash, include=T, eval=T, echo=3:4}
+for i in {1..8}; do bash LIB1ngsfilter_part$i.sh & done
+for i in {1..8}; do bash LIB2ngsfilter_part$i.sh & done
+
+#grep -c ">" Good_LIB1* | sed 's/.*/PairedL1: \0/' >> pipeline.stats
+#grep -c ">" Good_LIB2* | sed 's/.*/PairedL2: \0/' >> pipeline.stats
+
+```
+<br>
+<br>
+
+### 5. Filter the seqs with length between 303 and 323 bp and remove seqs with 'N'
+```{bash, include=T, eval=F}
+for i in {1..8}; do bash LIB1lenfilter_part$i.sh & done
+for i in {1..8}; do bash LIB1lenfilter_part$i.sh & done
+```
+<br>
+<br>
+
+### 6. Concatenate the files
+> <span style="color:red; font-size:1em;">IMPORTANT</span> if you are running multiple libraries from the same project concatenate them all here (must have unique names across libs as per ngsfilter .tsv)
+```{bash, include=T, eval=F}
+cat LIB*.filtered_length.part-*fasta > LIBM.filtered_length.fasta
+
+#grep -c ">" LIBM.filtered_length.fasta | sed 's/.*/lengthFilt: \0/' >> pipeline.stats 
+```
+<br>
+<br>
+
+### 7. Calculate stats per sample
+```{bash, include=T, eval=F}
+obistat -c sample -a seq_length LIB1.filtered_length.fasta > sample_stats_LIB1.txt
+```
+<br>
+<br>
+
+### 8. Remove chimaeras on a sample-by-sample LIBis
+##### 8.1 Distribute by samples
+```{bash, include=T, eval=F}
+obisplit -t sample LIBM.filtered_length.fasta 
+```
+<br>
+
+##### 8.2 Dereplicate each sample (change numbers to your samples, i.e. 01..96})
+```{bash, include=T, eval=F}
+for i in {001..192};do /home/els/SOFTWARE/OBITools-1.2.12/bin/obiuniq Smpl$i.fasta > Smpl$i.unique.fasta; done
+```
+<br>
+
+##### 8.3 Change format to vsearch (change numbers to your samples, i.e. 01..96})
+```{bash, include=T, eval=F}
+for i in {001..192};; do /home/cbaillie/SOFTWARE/SeaDNA/obitools-parallel/owi_obisample2vsearch -i Smpl$i.unique.fasta -o Smpl$i.vsearch.fasta; done
+```
+<br>
+
+##### 8.4 Run UCHIME *de novo* in VSEARCH (change numbers to your samples, i.e. 01..96})
+```{bash, include=T, eval=F}
+for i in {001..192}; do vsearch --uchime_denovo Smpl$i.vsearch.fasta --sizeout --nonchimeras Smpl$i.nonchimeras.fasta --chimeras Smpl$i.chimeras.fasta --uchimeout Smpl$i.uchimeout.txt; done
+```
+<br>
+
+##### 8.5 Concatenate non-chimeras files
+```{bash, include=T, eval=F}
+cat  Smpl*.nonchimeras.fasta > LIB1.nonchimeras.fasta
+```
+<br>
+
+##### 8.6 Return from vsearch to obitools format
+```{bash, include=T, eval=F}
+owi_vsearch2obifasta -i LIB1.nonchimeras.fasta -o LIB1.nonchimeras.obi.fasta
+```
+<br>
+<br>
+
+### 9. Group the uniqure seqs (dereplicate)
+```{bash, include=T, eval=F}
+obiuniq -m sample LIB1.nonchimeras.obi.fasta > LIB1.unique.fasta
+```
+<br>
+<br>
+
+### 10. Exchange the identifier for a short index (change header name)
+```{bash, include=T, eval=F}
+obiannotate --seq-rank LIB1.unique.fasta | obiannotate --set-identifier '"'LIB1'_%09d" % seq_rank' > LIB1.new.fasta
+```
+<br>
+<br>
+
+
+### 11. Clustering with swarm 
+##### 11.1 Change the format to vsearch again
+```{bash, include=T, eval=F}
+owi_obifasta2vsearch -i MYC1.new.fasta -o MYC1.vsearch.fasta
+```
+<br>
+
+##### 11.2 Clustering with swarm (see https://github.com/torognes/swarm for guidance on values of 'd' parameter)
+```{bash, include=T, eval=F}
+swarm -d 1 -z -t 6 -o LIB1_SWARM1_output -s LIB1_SWARM1_stats -w LIB1_SWARM1_seeds.fasta LIB1.vsearch.fasta
+```
+<br>
+<br>
+
+### 12. Calculate clustered abundances
+##### 12.1 Get the tab file:
+```{bash, include=T, eval=F}
+obitab -o LIB1.new.fasta >  LIB1.new.tab
+```
+<br>
+
+##### 12.2 Get the abundance table for every MOTU:
+```{bash, include=T, eval=F}
+owi_recount_swarm LIBM_SWARM1_output LIBM.new.tab
+```
+**Timing**: 30s  
+**Output**: LIB1_SWARM13_output.counts.csv, NNNNN MOTUs
+<br>
+<br>
+
+### 13. Delete singleton MOTUs from seeds file
+```{bash, include=T, eval=F}
+sed -i 's/;size=/; size=/' LIBM_SWARM1_seeds.fasta # First change the headers so they're compatible with obitools
+
+obigrep -p 'size>1' LIBM_SWARM1_seeds.fasta > LIBM_SWARM1_seeds_nonsingletons.fasta
+```
+<br>
+<br>
+
+### 14. Annotation with ecotag
+##### 14.1 Split the files into 6 parts (for multicore processing)
+```{bash, include=T, eval=F}
+obidistribute -n 6 -p 'LIBM_seeds_part' LIBM_SWARM1_seeds_nonsingletons.fasta
+```
+<br>
+
+##### 14.2 Execute ecotag
+```{bash, include=T, eval=F}
+for i in {1..6} ; do ecotag -d REFERENCE_TAXONOMY -R REFERENCE_SEQUENCES LIBM_seeds_part_$i.fasta > LIBM_ecotag_part_$i.fasta & done
+```
+<br>
+
+##### 14.3 Concatenate the results
+```{bash, include=T, eval=F}
+cat LIBM_ecotag_part_*.fasta > LIBM_SWARM1.ecotag.fasta
+```
+<br>
+<br>
+
+### 15. Add higher level taxonomy
+```{bash, include=T, eval=F}
+owi_add_taxonomy LIBM_SWARM1.ecotag.fasta
+```
+<br>
+<br>
+
+### 16. Combine ecotag and abundance files
+```{bash, include=T, eval=F}
+owi_combine -i LIBM_SWARM1.ecotag.fasta.annotated.csv -a LIBM_SWARM1_output.counts.csv -o LIBM_SWARM1.All_MOTUs.csv
+```
+<br>
+<br>
+
+### 17. Remove MOTUs that do not account for a minimum of 0.01% of total abundance in at least one sample
+```{bash, include=T, eval=F}
+owi_remove_low_abundance -i LIBM_SWARM1.All_MOTUs.csv -t 0.0001
+```
+<br>
+

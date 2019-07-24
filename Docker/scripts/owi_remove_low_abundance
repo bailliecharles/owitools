@@ -1,0 +1,76 @@
+#!/usr/local/bin/Rscript
+
+## Script for removing low abundance MOTUs from a metabarcoding csv file
+## The script will calculate relative abundance of MOTUs in every sample column and will remove all reads from MOTUs less abundant than a given threshold
+## The input file must be a csv file with sample columns beginning with "Smpl"
+## If the output file argument is empty, it ill just add ".low_abundance_cut.csv" at the end of the name of the input file.
+## By Owen S. Wangensteen - Project Metabarpark  2016
+
+library("optparse")
+
+option_list = list(
+  make_option(c("-i", "--infile"), type="character", default=NULL,
+              help="Input csv metabarcoding file with sample columns beginning with 'Smpl'", metavar="character"),
+  make_option(c("-o", "--outfile"), type="character", default=NULL,
+              help="Output file name [default = input file ending in low_abundance_cut.csv]", metavar="character"),
+  make_option(c("-t", "--threshold"), type="numeric", default=0.0001,
+              help="Threshold of minimal abundances to remove [default = 0.0001]", metavar="numeric")
+)
+
+opt_parser = OptionParser(option_list=option_list)
+opt = parse_args(opt_parser)
+
+if (is.null(opt$infile) ){
+  print_help(opt_parser)
+  stop("At least one argument must be supplied (input csv file with abundances and sample columns beginning with Smpl.).", call.=FALSE)
+}
+
+if (is.null(opt$outfile)){
+  opt$outfile <- paste(substr(opt$infile,1,nchar(opt$infile)-4),".low_abundance_cut.csv",sep="")
+}
+
+if (is.null(opt$threshold)){
+  opt$threshold <- 0.0001
+}
+
+
+
+# Read db
+db <- read.table(opt$infile,sep=";",head=T,stringsAsFactors = F)
+
+# The sample columns are identified by names starting with "Smpl"
+sample_cols<-substr(colnames(db),1,4)=="Smpl"
+
+# Calculate total per sample (needed for the relative abundance)
+total_per_Sample<-colSums(db[,sample_cols])
+
+# Calculate a list of relative abundances for every MOTU
+abun_rel_motu<-list()
+for (i in 1:nrow(db)) {
+	abun_rel_motu[[i]] <- as.numeric(db[i,sample_cols]/total_per_Sample)
+}
+abun_rel_motu<-lapply(abun_rel_motu, function(x) ifelse(is.nan(x),0,x))
+
+# Calculate a boolean variable that will be true if the maximum value of relative abundance
+# of the MOTU in any sample is greater than 0.01%
+keep<-NULL
+for (i in 1:length(abun_rel_motu)) keep[i]<-!max(abun_rel_motu[[i]])<opt$threshold
+
+# Get the MOTUs to keep
+db_corrected <- db[keep,]
+
+# Get new total abundances per sample and total removed reads due to low abundance
+new_totals <- colSums(db_corrected[,sample_cols])
+removed_reads<-total_per_Sample-new_totals
+message(sum(removed_reads)," total reads removed")
+
+# Add a row with the removed reads at the end of the abundance table
+abundances <- rbind(db_corrected[,sample_cols],removed_reads)
+rest <- rbind(db_corrected[,!sample_cols],c("removed_reads"," ","removed_reads",rep(" ",ncol(db)-10),
+        sum(removed_reads)," "))
+db_final<-cbind(rest[1:15],abundances,rest[16:ncol(rest)])
+
+# Write the output
+write.table(db_final,opt$outfile,sep=";",row.names=F)
+message("File ",opt$outfile," written with ",nrow(db_final)-1," MOTUs.")
+
